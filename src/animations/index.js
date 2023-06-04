@@ -7,3 +7,9 @@ export const fadeinOut = {
   animate: { opacity: 1 },
   exit: { opacity: 0 },
 };
+
+export const slideTop={
+  initial:{opcity:0,y:30},
+  animate:{opcity:0,y:30},
+  exit:{opcity:0,y:30},
+}

@@ -1,33 +1,110 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import loginBg from "../assets/img/loginBg.jpg";
 import logo from "../assets/img/logo.png";
 import LoginInput from "./LoginInput";
 import { FaEnvelope, FaLock, FcGoogle } from "../assets/icons";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { buttonClick } from "../animations";
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { app } from "../config/firebase.config";
+import { validateUserJWTToken } from "../api";
+import { useDispatch, useSelector } from "react-redux";
+import { setUserDetails } from "../context/actions/userActions";
+import { alertInfo, alertWarning } from "../context/actions/alertActions";
 
 function Login() {
   const [userEmail, setuserEmail] = useState("");
   const [isSignup, setisSignup] = useState(false);
   const [password, setPassword] = useState("");
   const [Confirm_password, setConfirm_Password] = useState("");
-  const firebaseAuth = getAuth(app);
 
+  const firebaseAuth = getAuth(app);
+  const navigate = useNavigate();
   const provider = new GoogleAuthProvider();
+  const dispatch = useDispatch();
+
+  const user = useSelector((state) => state.user);
+  const alert = useSelector((state) => state.alert);
+
+  useEffect(() => {
+    if (user) {
+      navigate("/", { replace: true });
+    }
+  }, [user]);
 
   const loginWithGoogle = async () => {
     await signInWithPopup(firebaseAuth, provider).then((userCred) => {
       firebaseAuth.onAuthStateChanged((cred) => {
         if (cred) {
           cred.getIdToken().then((token) => {
-            console.log(token);
+            validateUserJWTToken(token).then((data) => {
+              dispatch(setUserDetails(data));
+            });
+            navigate("/", { replace: true });
           });
         }
       });
     });
   };
+  async function signUpWithEmailPass() {
+    if (userEmail === "" || password === "" || Confirm_password === "") {
+      dispatch(alertInfo("Required fields should not be empty"));
+    } else {
+      if (password === Confirm_password) {
+        setuserEmail("");
+        setConfirm_Password("");
+        setPassword("");
+        await createUserWithEmailAndPassword(
+          firebaseAuth,
+          userEmail,
+          password
+        ).then((userCred) => {
+          firebaseAuth.onAuthStateChanged((cred) => {
+            if (cred) {
+              cred.getIdToken().then((token) => {
+                validateUserJWTToken(token).then((data) => {
+                  dispatch(setUserDetails(data));
+                });
+                navigate("/", { replace: true });
+              });
+            }
+          });
+        });
+      } else {
+        // alert message
+        dispatch(alertWarning("password and confirm password should be same"));
+      }
+    }
+  }
+
+  const signInWithEmailPass = async () => {
+    if (userEmail !== "" && password !== "") {
+      await signInWithEmailAndPassword(firebaseAuth, userEmail, password).then(
+        (userCred) => {
+          firebaseAuth.onAuthStateChanged((cred) => {
+            if (cred) {
+              cred.getIdToken().then((token) => {
+                validateUserJWTToken(token).then((data) => {
+                  dispatch(setUserDetails(data));
+                });
+                navigate("/", { replace: true });
+              });
+            }
+          });
+        }
+      );
+    } else {
+      dispatch(alertWarning("password and confirm password should be same"));
+    }
+  };
+
   return (
     <div className="w-screen h-screen relative overflow-hidden flex">
       {/* background image */}
@@ -116,6 +193,7 @@ function Login() {
             <motion.button
               {...buttonClick}
               className="w-full px-4 py-2 rounded-md bg-red-400 cursor-pointer text-white text-xl capitalize hover:bg-red-500 transition-all duration-150"
+              onClick={signUpWithEmailPass}
             >
               Sign Up
             </motion.button>
@@ -123,6 +201,7 @@ function Login() {
             <motion.button
               {...buttonClick}
               className="w-full px-4 py-2 rounded-md bg-red-400 cursor-pointer text-white text-xl capitalize hover:bg-red-500 transition-all duration-150"
+              onClick={signInWithEmailPass}
             >
               Sign In
             </motion.button>
